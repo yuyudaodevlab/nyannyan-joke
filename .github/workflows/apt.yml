@@ -1,0 +1,31 @@
+name: Publish APT Repository
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Debian Package
+        run: |
+          mkdir -p repo
+          dpkg-deb --build nyannyan repo/nyannyan_1.0_all.deb
+
+      - name: Create APT Repository
+        run: |
+          cd repo
+          dpkg-scanpackages . /dev/null > Packages
+          gzip -k -f Packages
+          apt-ftparchive release . > Release
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./repo

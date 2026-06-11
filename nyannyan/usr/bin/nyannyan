@@ -1,0 +1,141 @@
+#!/bin/bash
+
+# Default values
+DURATION=3
+WAKEUP=0
+
+function show_help() {
+    echo "Usage: nyannyan [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -t SECONDS    Display the animation for SECONDS. 0 for infinite."
+    echo "  -wakeup       Play the wake up animation."
+    echo "  -help         Show this help message."
+    echo ""
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -t)
+            DURATION="$2"
+            shift 2
+            ;;
+        -wakeup)
+            WAKEUP=1
+            shift
+            ;;
+        -help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+# Save screen state and hide cursor
+tput smcup
+tput civis
+
+function cleanup() {
+    # Restore screen state and cursor
+    tput rmcup
+    tput cnorm
+    exit 0
+}
+
+# Trap signals to ensure cleanup is called on interrupt
+trap cleanup SIGINT SIGTERM
+
+function center_print() {
+    local text="$1"
+    local term_height=$(tput lines)
+    local term_width=$(tput cols)
+
+    local lines=$(echo "$text" | wc -l)
+    local max_width=$(echo "$text" | awk '{ print length }' | sort -nr | head -1)
+
+    local pad_y=$(( (term_height - lines) / 2 ))
+    local pad_x=$(( (term_width - max_width) / 2 ))
+
+    clear
+
+    for ((i=0; i<pad_y; i++)); do
+        echo ""
+    done
+
+    echo "$text" | while IFS= read -r line; do
+        printf "%${pad_x}s%s\n" "" "$line"
+    done
+}
+
+if [ "$WAKEUP" -eq 1 ]; then
+    FRAME1="
+   z
+ |\_/|
+ ( -.- )
+  > ^ <
+"
+    FRAME2="
+ |\_/|
+ ( o.o )
+  > ^ <
+"
+    FRAME3="
+  |\_ /|
+ / 0.0 \\
+(   \"   )
+ \~(*)~ /
+"
+    center_print "$FRAME1"
+    sleep 1
+    center_print "$FRAME2"
+    sleep 1
+    center_print "$FRAME3"
+    sleep 2
+else
+    FRAME1="
+      Z
+     z
+ |\_/|
+ ( -.- )
+  > ^ <
+"
+    FRAME2="
+       Z
+      z
+ |\_/|
+ ( -.- )
+  > ^ <
+"
+    START_TIME=$(date +%s)
+
+    while true; do
+        center_print "$FRAME1"
+        sleep 0.5
+
+        CURRENT_TIME=$(date +%s)
+        if [ "$DURATION" -gt 0 ]; then
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            if [ "$ELAPSED" -ge "$DURATION" ]; then
+                break
+            fi
+        fi
+
+        center_print "$FRAME2"
+        sleep 0.5
+
+        CURRENT_TIME=$(date +%s)
+        if [ "$DURATION" -gt 0 ]; then
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            if [ "$ELAPSED" -ge "$DURATION" ]; then
+                break
+            fi
+        fi
+    done
+fi
+
+cleanup
