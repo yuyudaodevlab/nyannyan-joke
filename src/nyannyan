@@ -1,0 +1,167 @@
+#!/bin/bash
+
+# nyannyan joke command
+# Displays a sleeping cat ASCII art animation in the terminal.
+
+# Default duration for sleeping (seconds)
+DURATION=3
+WAKEUP_MODE=0
+HELP_MODE=0
+
+# Parse arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -t)
+            if [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
+                DURATION="$2"
+                shift 2
+            else
+                echo "Error: -t requires a numeric argument."
+                exit 1
+            fi
+            ;;
+        -wakeup)
+            WAKEUP_MODE=1
+            shift
+            ;;
+        -help|--help|-h)
+            HELP_MODE=1
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use -help for usage."
+            exit 1
+            ;;
+    esac
+done
+
+if [[ "$HELP_MODE" -eq 1 ]]; then
+    echo "Usage: nyannyan [OPTIONS]"
+    echo ""
+    echo "Displays a sleeping cat ASCII art animation in the terminal."
+    echo ""
+    echo "Options:"
+    echo "  -t <seconds>   Duration of the animation in seconds. 0 for infinite. (Default: 3)"
+    echo "  -wakeup        Display the cat waking up animation."
+    echo "  -help, --help  Show this help message."
+    exit 0
+fi
+
+# Cleanup on exit or interrupt
+cleanup() {
+    tput rmcup # Restore screen
+    tput cnorm # Show cursor
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM EXIT
+
+# Prepare screen
+tput smcup # Save screen
+tput civis # Hide cursor
+clear
+
+# Get terminal size
+COLS=$(tput cols)
+LINES=$(tput lines)
+
+# Calculate center position for cat (assuming 4 lines, 30 columns)
+CAT_LINES=4
+CAT_COLS=30
+START_Y=$(( (LINES - CAT_LINES) / 2 ))
+START_X=$(( (COLS - CAT_COLS) / 2 ))
+
+# Ensure non-negative
+[[ $START_Y -lt 0 ]] && START_Y=0
+[[ $START_X -lt 0 ]] && START_X=0
+
+draw_cat() {
+    local frame="$1"
+    
+    # Fill background with Zzz (optional effect) or just clear
+    clear
+    
+    local line1 line2 line3 line4
+
+    if [[ "$WAKEUP_MODE" -eq 0 ]]; then
+        # Sleeping frames
+        line1="    |\\      _,,,---,,_"
+        line2="    /,%.-'%'%    -.  ;-;;,_" # Replaced backticks with % temporarily to avoid issues, or use raw string
+        line2="    /,\`.-'\`'    -.  ;-;;,_"
+        line3="   |,4-  ) )-,_..;\\ (  \`'-'"
+        
+        if [[ "$frame" -eq 0 ]]; then
+            line4="  '---''(_/--'  \`-'\\_)   Zzz..."
+        elif [[ "$frame" -eq 1 ]]; then
+            line4="  '---''(_/--'  \`-'\\_)     Zzz..."
+        elif [[ "$frame" -eq 2 ]]; then
+            line4="  '---''(_/--'  \`-'\\_)       Zzz..."
+        else
+            line4="  '---''(_/--'  \`-'\\_)     Zzz..."
+        fi
+    else
+        # Wakeup frames
+        if [[ "$frame" -eq 0 ]]; then
+            line1="    |\\      _,,,---,,_"
+            line2="    /,\`.-'\`'    -.  ;-;;,_"
+            line3="   |,4-  ) )-,_..;\\ (  \`'-'"
+            line4="  '---''(_/--'  \`-'\\_)"
+        elif [[ "$frame" -eq 1 ]]; then
+            line1="    |\\      _,,,---,,_"
+            line2="    /,\`.-'\`'    -.  ;-;;,_"
+            line3="   |,o-  ) )-,_..;\\ (  \`'-'"
+            line4="  '---''(_/--'  \`-'\\_)"
+        elif [[ "$frame" -eq 2 ]]; then
+            line1="    |\\__/,|   (\`\\"
+            line2="  _.|o o  |_   ) )"
+            line3=" -(((---(((--------"
+            line4="                   "
+        else
+            line1="    |\\__/,|   (\`\\"
+            line2="    |_ _  |.--.) )"
+            line3="    ( T   )     /"
+            line4="   (((^_(((/(((_/"
+        fi
+    fi
+
+    tput cup $START_Y $START_X
+    echo "$line1"
+    tput cup $((START_Y + 1)) $START_X
+    echo "$line2"
+    tput cup $((START_Y + 2)) $START_X
+    echo "$line3"
+    tput cup $((START_Y + 3)) $START_X
+    echo "$line4"
+}
+
+if [[ "$WAKEUP_MODE" -eq 1 ]]; then
+    # Wakeup animation sequence
+    for i in 0 1 2 3; do
+        draw_cat $i
+        sleep 0.8
+    done
+    sleep 1
+else
+    # Sleeping animation loop
+    FRAME=0
+    ELAPSED=0
+    SLEEP_INTERVAL=0.5
+    
+    while true; do
+        draw_cat $FRAME
+        FRAME=$(( (FRAME + 1) % 4 ))
+        
+        sleep $SLEEP_INTERVAL
+        
+        # Check duration if not infinite
+        if [[ "$DURATION" -gt 0 ]]; then
+            ELAPSED=$(echo "$ELAPSED + $SLEEP_INTERVAL" | bc -l)
+            if (( $(echo "$ELAPSED >= $DURATION" | bc -l) )); then
+                break
+            fi
+        fi
+    done
+fi
+
+# Cleanup will be called by EXIT trap

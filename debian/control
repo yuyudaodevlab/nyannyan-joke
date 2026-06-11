@@ -1,0 +1,13 @@
+Source: nyannyan
+Section: games
+Priority: optional
+Maintainer: YuyuDaoDevLab <yuyudaodevlab@example.com>
+Build-Depends: debhelper (>= 12)
+Standards-Version: 4.5.0
+
+Package: nyannyan
+Architecture: all
+Depends: bash (>= 4.0), ncurses-bin
+Description: Sleeping cat ASCII art animation for your terminal
+ A joke command that displays a sleeping cat animation
+ in your terminal. Nyan nyan!

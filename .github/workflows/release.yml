@@ -1,0 +1,100 @@
+name: Release and Publish APT
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y debhelper dpkg-dev
+
+      - name: Build Debian package
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Move .deb to workspace
+        run: |
+          mkdir -p dist
+          mv ../nyannyan_*.deb dist/
+
+      - name: Upload .deb to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.deb
+
+      - name: Upload artifact for pages
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: dist/*.deb
+
+  publish-apt:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+        # If gh-pages doesn't exist, this step might fail. 
+        # In a real setup, make sure to create an orphan gh-pages branch first.
+        continue-on-error: true
+
+      - name: Setup APT repository structure
+        run: |
+          mkdir -p pool/main
+          mkdir -p dists/stable/main/binary-all
+
+      - name: Download .deb artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-package
+          path: pool/main/
+
+      - name: Generate APT metadata
+        run: |
+          cd pool/main
+          dpkg-scanpackages . /dev/null > ../../dists/stable/main/binary-all/Packages
+          gzip -k -f ../../dists/stable/main/binary-all/Packages
+          
+          cd ../../dists/stable
+          cat <<EOF > Release
+          Origin: YuyuDaoDevLab
+          Label: Nyannyan Joke Command
+          Suite: stable
+          Codename: stable
+          Architectures: all
+          Components: main
+          Description: APT repository for nyannyan-joke
+          EOF
+          
+          # Optional: GPG sign here if keys are configured
+          # gpg --default-key "\${GPG_KEY_ID}" -abs -o Release.gpg Release
+          # gpg --default-key "\${GPG_KEY_ID}" --clearsign -o InRelease Release
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+  deploy-pages:
+    needs: publish-apt
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
